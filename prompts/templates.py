@@ -2,6 +2,8 @@
 Prompt templates for the EcoIntel AI system.
 Contains all system prompts for natural language parsing, environmental analysis,
 scientific reasoning, recommendation generation, and report synthesis.
+
+Note: Literal JSON curly braces are doubled ({{ and }}) for Python str.format() compatibility.
 """
 
 INPUT_PARSER_PROMPT = """You are an expert environmental scientist and data analyst.
@@ -26,7 +28,7 @@ Examples:
 - "we only grow one crop" -> "habitat_diversity": "low", "land_use": "monoculture"
 
 Ensure the output is valid JSON format exactly as follows:
-{
+{{
     "soil_carbon": "...",
     "soil_moisture": "...",
     "soil_ph": "...",
@@ -38,7 +40,7 @@ Ensure the output is valid JSON format exactly as follows:
     "region": "...",
     "pollution_level": "...",
     "deforestation_rate": "..."
-}
+}}
 If a variable is not mentioned explicitly or implicitly, set its value to null.
 """
 
@@ -52,10 +54,10 @@ Parsed Data:
 {parsed_data}
 
 Provide your response in JSON format exactly as follows:
-{
+{{
     "missing_critical_fields": ["field1", "field2"],
     "questions": ["Question 1?", "Question 2?"]
-}
+}}
 """
 
 ENVIRONMENTAL_ANALYSIS_PROMPT = """You are a senior environmental scientist. Perform a multi-variable analysis on the provided environmental parameters.
@@ -68,12 +70,12 @@ Environmental Variables:
 {variables}
 
 Output your analysis as valid JSON exactly as follows:
-{
+{{
     "current_ecosystem_state": "...",
     "stress_factors": ["...", "..."],
     "positive_factors": ["...", "..."],
     "interaction_effects": ["...", "..."]
-}
+}}
 """
 
 SCIENTIFIC_REASONING_PROMPT = """You are a senior environmental scientist. Using the environmental analysis and retrieved scientific evidence, perform a deep scientific reasoning task.
@@ -93,17 +95,17 @@ Scientific Evidence:
 {evidence}
 
 Output structured JSON exactly like this:
-{
+{{
     "root_causes": ["..."],
     "risk_drivers": ["..."],
     "ecological_impacts": ["..."],
     "literature_cross_reference": ["..."],
     "quantified_risks": ["..."],
-    "confidence_assessment": {
+    "confidence_assessment": {{
         "level": "High/Medium/Low",
         "justification": "..."
-    }
-}
+    }}
+}}
 """
 
 RECOMMENDATION_PROMPT = """You are a senior environmental scientist. Generate actionable, science-based recommendations to improve the ecosystem based on the analysis.
@@ -126,9 +128,9 @@ Scientific Evidence:
 {evidence}
 
 Output as JSON exactly like this:
-{
+{{
     "recommendations": [
-        {
+        {{
             "action": "...",
             "scientific_rationale": "...",
             "metrics_improved": ["...", "..."],
@@ -136,9 +138,9 @@ Output as JSON exactly like this:
             "time_horizon": "...",
             "supporting_evidence_citations": ["...", "..."],
             "priority": "High"
-        }
+        }}
     ]
-}
+}}
 """
 
 REPORT_GENERATION_PROMPT = """You are the lead environmental scientist finalizing the site assessment report. Synthesize everything into a highly professional, structured report.
@@ -191,11 +193,11 @@ Environmental Analysis:
 {analysis}
 
 Output JSON format exactly as follows:
-{
+{{
     "queries": [
         "query 1",
         "query 2",
         "query 3"
     ]
-}
+}}
 """

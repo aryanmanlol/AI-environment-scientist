@@ -31,5 +31,6 @@ vectordb/*.sqlite3
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
+# Output test files
+*.html
+test_report.html
