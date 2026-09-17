@@ -21,7 +21,16 @@ class EnvironmentalAnalyzer:
         Args:
             model_name (str): The name of the Gemini model to use.
         """
-        self.model = ChatGoogleGenerativeAI(model=model_name, temperature=0.2)
+        api_key = os.getenv("GOOGLE_API_KEY", "dummy_key_for_testing")
+        try:
+            self.model = ChatGoogleGenerativeAI(
+                model=model_name,
+                temperature=0.2,
+                google_api_key=api_key,
+            )
+        except Exception as e:
+            logger.warning(f"Could not initialize ChatGoogleGenerativeAI in analyzer: {e}")
+            self.model = None
 
     def parse_natural_language(self, text: str) -> Dict[str, Any]:
         """

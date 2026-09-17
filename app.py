@@ -18,6 +18,8 @@ from typing import Any, Dict
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from modules.models import AnalysisRequest
@@ -80,10 +82,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files directory if it exists
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
 
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
+@app.get("/")
+async def root():
+    """Serve the interactive Web Dashboard."""
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"message": "EcoIntel AI API running. Access /health or /docs"}
+
 
 @app.get("/health")
 async def health_check():

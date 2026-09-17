@@ -27,11 +27,17 @@ class MultiMetricReasoningEngine:
         """
         Initializes the reasoning engine with a low-temperature LLM for scientific accuracy.
         """
-        self.llm = ChatGoogleGenerativeAI(
-            model=model_name,
-            temperature=0.1,
-            response_mime_type="application/json"
-        )
+        api_key = os.getenv("GOOGLE_API_KEY", "dummy_key_for_testing")
+        try:
+            self.llm = ChatGoogleGenerativeAI(
+                model=model_name,
+                temperature=0.1,
+                google_api_key=api_key,
+                response_mime_type="application/json",
+            )
+        except Exception as e:
+            logger.warning(f"Could not initialize ChatGoogleGenerativeAI in reasoner: {e}")
+            self.llm = None
 
     def generate_rag_queries(self, environmental_analysis: str) -> List[str]:
         """

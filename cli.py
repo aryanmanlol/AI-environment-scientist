@@ -46,6 +46,10 @@ def main():
         "-o", "--output",
         help="Optional path to save output report (JSON format)"
     )
+    parser.add_argument(
+        "--html",
+        help="Optional path to export HTML assessment report"
+    )
 
     args = parser.parse_args()
 
@@ -68,7 +72,7 @@ def main():
         raw_input = args.text
 
     print("\n" + "=" * 60)
-    print("🌿 EcoIntel AI - Starting Ecosystem Assessment Pipeline...")
+    print("[EcoIntel AI] Starting Ecosystem Assessment Pipeline...")
     print("=" * 60 + "\n")
 
     from modules.workflow import EcoIntelWorkflow
@@ -77,7 +81,7 @@ def main():
     result = workflow.run(raw_input)
 
     if result.get("error"):
-        print(f"\n❌ Error during assessment: {result['error']}")
+        print(f"\n[Error] Error during assessment: {result['error']}")
         sys.exit(1)
 
     if result.get("assessment_report"):
@@ -87,16 +91,27 @@ def main():
         if args.output:
             with open(args.output, "w") as f:
                 json.dump(report, f, indent=2)
-            print(f"\n💾 Report saved to {args.output}")
+            print(f"\n[Saved] JSON Report saved to {args.output}")
+
+        if args.html:
+            from modules.models import AssessmentReport
+            from modules.pdf_exporter import ReportExporter
+            
+            try:
+                report_obj = AssessmentReport(**report)
+                html_path = ReportExporter.export_to_html(report_obj, args.html)
+                print(f"[Exported] HTML Report exported to: {html_path}")
+            except Exception as e:
+                logger.error(f"Failed to export HTML report: {e}")
 
     elif result.get("follow_up_questions"):
-        print("\n❓ Data Insufficient for Complete Assessment:")
+        print("\n[Data Insufficient] Additional data needed for assessment:")
         print("Missing critical fields:", ", ".join(result.get("missing_fields", [])))
         print("\nPlease provide answers to the following questions:")
         for q in result.get("follow_up_questions", []):
-            print(f"  • {q}")
+            print(f"  * {q}")
     else:
-        print("\n⚠️ Assessment completed with state:", result)
+        print("\n[Notice] Assessment completed with state:", result)
 
 
 if __name__ == "__main__":

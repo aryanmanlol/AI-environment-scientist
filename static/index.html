@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoIntel AI - Biodiversity Assessment Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <style>
+    :root {
+      --primary-green: #1b4332;
+      --accent-green: #2d6a4f;
+      --light-green: #d8f3dc;
+      --bg-light: #f8f9fa;
+    }
+    body {
+      background-color: var(--bg-light);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    .hero-header {
+      background: linear-gradient(135deg, var(--primary-green) 0%, var(--accent-green) 100%);
+      color: white;
+      padding: 2.5rem 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .card-custom {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      transition: transform 0.2s;
+    }
+    .badge-risk-CRITICAL { background-color: #dc3545; }
+    .badge-risk-HIGH { background-color: #fd7e14; }
+    .badge-risk-MEDIUM { background-color: #ffc107; color: black; }
+    .badge-risk-LOW { background-color: #198754; }
+    .report-output {
+      font-family: 'Courier New', Courier, monospace;
+      white-space: pre-wrap;
+      background: #1e1e1e;
+      color: #00ff66;
+      padding: 1.5rem;
+      border-radius: 8px;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .nav-tabs .nav-link.active {
+      font-weight: 600;
+      color: var(--primary-green);
+      border-bottom: 3px solid var(--primary-green);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="hero-header mb-4">
+    <div class="container">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <h1 class="h2 mb-1"><i class="bi bi-tree-fill me-2"></i>EcoIntel AI</h1>
+          <p class="mb-0 text-light opacity-75">AI Biodiversity Assessment & Scientific Decision Support Engine</p>
+        </div>
+        <span class="badge bg-light text-dark px-3 py-2 fs-6">
+          <i class="bi bi-cpu me-1"></i> LangGraph + Gemini RAG
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container pb-5">
+    <div class="row g-4">
+      
+      <!-- Input Panel -->
+      <div class="col-lg-5">
+        <div class="card card-custom p-4">
+          <h5 class="card-title mb-3"><i class="bi bi-sliders me-2"></i>Ecosystem Input</h5>
+          
+          <ul class="nav nav-tabs mb-3" id="inputTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="text-tab" data-bs-toggle="tab" data-bs-target="#text-panel" type="button">Natural Language</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="structured-tab" data-bs-toggle="tab" data-bs-target="#structured-panel" type="button">Structured Parameters</button>
+            </li>
+          </ul>
+
+          <div class="tab-content" id="inputTabsContent">
+            <!-- Natural Language Panel -->
+            <div class="tab-pane fade show active" id="text-panel">
+              <div class="mb-3">
+                <label for="nlInput" class="form-label text-muted small">Describe ecosystem condition in plain text:</label>
+                <textarea class="form-control" id="nlInput" rows="7" placeholder="e.g. My soil organic carbon is low at 0.4%, rainfall is sparse, land use is monoculture wheat, and species richness has declined significantly over the past 3 years."></textarea>
+              </div>
+            </div>
+
+            <!-- Structured Panel -->
+            <div class="tab-pane fade" id="structured-panel">
+              <div class="row g-2">
+                <div class="col-6 mb-2">
+                  <label class="form-label small">Soil Carbon (%)</label>
+                  <input type="number" step="0.1" class="form-control form-control-sm" id="soilCarbon" placeholder="e.g. 0.5">
+                </div>
+                <div class="col-6 mb-2">
+                  <label class="form-label small">Soil Moisture (%)</label>
+                  <input type="number" step="0.1" class="form-control form-control-sm" id="soilMoisture" placeholder="e.g. 15.0">
+                </div>
+                <div class="col-6 mb-2">
+                  <label class="form-label small">Soil pH</label>
+                  <input type="number" step="0.1" class="form-control form-control-sm" id="soilPh" placeholder="e.g. 6.2">
+                </div>
+                <div class="col-6 mb-2">
+                  <label class="form-label small">Rainfall</label>
+                  <select class="form-select form-select-sm" id="rainfall">
+                    <option value="">Select...</option>
+                    <option value="low">Low</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+                <div class="col-6 mb-2">
+                  <label class="form-label small">Land Use</label>
+                  <select class="form-select form-select-sm" id="landUse">
+                    <option value="">Select...</option>
+                    <option value="monoculture">Monoculture</option>
+                    <option value="mixed_agriculture">Mixed Agriculture</option>
+                    <option value="agroforestry">Agroforestry</option>
+                    <option value="forest">Forest</option>
+                  </select>
+                </div>
+                <div class="col-6 mb-2">
+                  <label class="form-label small">Deforestation</label>
+                  <select class="form-select form-select-sm" id="deforestationRate">
+                    <option value="">Select...</option>
+                    <option value="none">None</option>
+                    <option value="low">Low</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-success w-100 mt-3 py-2 fw-semibold" id="btnAnalyze" onclick="runAssessment()">
+            <i class="bi bi-lightning-charge-fill me-1"></i> Run Scientific Assessment
+          </button>
+        </div>
+      </div>
+
+      <!-- Output Panel -->
+      <div class="col-lg-7">
+        <div class="card card-custom p-4 h-100">
+          <h5 class="card-title mb-3 d-flex align-items-center justify-content-between">
+            <span><i class="bi bi-journal-text me-2"></i>Scientific Assessment Report</span>
+            <span id="riskBadgeContainer"></span>
+          </h5>
+
+          <div id="loader" class="text-center py-5 d-none">
+            <div class="spinner-border text-success mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+            <p class="text-muted fw-semibold">Performing multi-variable reasoning & RAG retrieval...</p>
+          </div>
+
+          <div id="resultsView">
+            <p class="text-muted text-center py-5">
+              <i class="bi bi-arrow-left-circle display-4 d-block mb-3 text-secondary"></i>
+              Submit environmental parameters to generate a full 10-section scientific assessment.
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    async function runAssessment() {
+      const btn = document.getElementById('btnAnalyze');
+      const loader = document.getElementById('loader');
+      const resultsView = document.getElementById('resultsView');
+      const riskBadge = document.getElementById('riskBadgeContainer');
+
+      const nlText = document.getElementById('nlInput').value.trim();
+      const activeTab = document.querySelector('#inputTabs .active').id;
+
+      let payload = {};
+
+      if (activeTab === 'text-tab') {
+        if (!nlText) {
+          alert('Please enter a natural language description.');
+          return;
+        }
+        payload = { natural_language: nlText };
+      } else {
+        const inputData = {
+          soil_carbon: parseFloat(document.getElementById('soilCarbon').value) || null,
+          soil_moisture: parseFloat(document.getElementById('soilMoisture').value) || null,
+          soil_ph: parseFloat(document.getElementById('soilPh').value) || null,
+          rainfall: document.getElementById('rainfall').value || null,
+          land_use: document.getElementById('landUse').value || null,
+          deforestation_rate: document.getElementById('deforestationRate').value || null,
+        };
+        payload = { input_data: inputData };
+      }
+
+      btn.disabled = true;
+      loader.classList.remove('d-none');
+      resultsView.classList.add('d-none');
+      riskBadge.innerHTML = '';
+
+      try {
+        const response = await fetch('/assessment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        loader.classList.add('d-none');
+        resultsView.classList.remove('d-none');
+
+        if (data.status === 'completed') {
+          const report = data.assessment_report;
+          const risk = report.risk_level || 'MEDIUM';
+          riskBadge.innerHTML = `<span class="badge badge-risk-${risk} fs-6 px-3 py-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>Risk: ${risk}</span>`;
+
+          resultsView.innerHTML = `
+            <div class="report-output">${escapeHtml(report.formatted_text || JSON.stringify(report, null, 2))}</div>
+          `;
+        } else if (data.status === 'needs_more_info') {
+          resultsView.innerHTML = `
+            <div class="alert alert-warning">
+              <h6><i class="bi bi-question-circle me-2"></i>Additional Environmental Data Needed:</h6>
+              <ul class="mb-0">
+                ${data.questions.map(q => `<li>${escapeHtml(q)}</li>`).join('')}
+              </ul>
+            </div>
+          `;
+        } else {
+          resultsView.innerHTML = `<div class="alert alert-danger">Error: ${escapeHtml(JSON.stringify(data))}</div>`;
+        }
+      } catch (err) {
+        loader.classList.add('d-none');
+        resultsView.classList.remove('d-none');
+        resultsView.innerHTML = `<div class="alert alert-danger">Request failed: ${escapeHtml(err.message)}</div>`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+  </script>
+</body>
+</html>
