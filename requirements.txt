@@ -1,0 +1,32 @@
+# EcoIntel AI - Dependencies
+# AI Biodiversity Assessment & Decision Support System
+
+# Core Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Agent Framework
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+
+# LLM Provider
+langchain-google-genai>=2.0.0
+
+# Embeddings
+langchain-huggingface>=0.1.0
+sentence-transformers>=2.2.0
+
+# Vector Database
+langchain-chroma>=0.2.0
+chromadb>=0.5.0
+
+# PDF Processing
+pypdf>=4.0.0
+
+# Data Validation
+pydantic>=2.0.0
+
+# Utilities
+python-dotenv>=1.0.0
