@@ -358,10 +358,3 @@ ecointel-ai/
 
 ---
 
-## 📄 License
-
-MIT License
-
----
-
-*Built with 🌱 by EcoIntel AI — Making biodiversity science accessible and actionable.*
