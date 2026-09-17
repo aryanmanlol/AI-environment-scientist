@@ -1,0 +1,13 @@
+{
+  "soil_carbon": 0.4,
+  "soil_moisture": 15.0,
+  "soil_ph": 5.2,
+  "rainfall": "low",
+  "temperature": 34.5,
+  "species_richness": "low",
+  "habitat_diversity": "low",
+  "land_use": "monoculture",
+  "region": "semi-arid",
+  "pollution_level": "moderate",
+  "deforestation_rate": "high"
+}

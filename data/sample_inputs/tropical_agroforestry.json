@@ -1,0 +1,13 @@
+{
+  "soil_carbon": 2.8,
+  "soil_moisture": 45.0,
+  "soil_ph": 6.1,
+  "rainfall": "moderate",
+  "temperature": 28.0,
+  "species_richness": "moderate",
+  "habitat_diversity": "moderate",
+  "land_use": "agroforestry",
+  "region": "tropical",
+  "pollution_level": "none",
+  "deforestation_rate": "moderate"
+}
