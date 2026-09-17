@@ -9,9 +9,11 @@ Report Creation
 
 import json
 import logging
+import uuid
 from typing import Any, Dict, List, Optional
 
 from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.documents import Document
 
 from modules.models import GraphState, RiskLevel
@@ -51,6 +53,11 @@ class EcoIntelWorkflow:
         num_chunks = self.knowledge_base.load_and_index_documents()
         logger.info(f"Knowledge base indexed: {num_chunks} chunks")
 
+        # Per-session conversation memory: lets a session's earlier answers
+        # (e.g. soil_carbon given in turn 1) persist into later turns
+        # (e.g. land_use given in turn 2) instead of each call starting blank.
+        self._checkpointer = MemorySaver()
+
         # Build and compile the LangGraph workflow
         self.graph = self._build_graph()
         logger.info("EcoIntel AI Workflow initialized successfully.")
@@ -72,12 +79,19 @@ class EcoIntelWorkflow:
         workflow.add_edge(START, "input_processing")
         workflow.add_edge("input_processing", "missing_data_detection")
 
-        # Conditional routing: if too many critical fields missing, return follow-up questions
+        # Conditional routing: if too many critical fields are still missing,
+        # return follow-up questions instead of analyzing incomplete data.
+        # iteration_count is now incremented every turn a session goes through
+        # input_processing (see _input_processing_node), so this caps how many
+        # rounds of clarifying questions we'll ask before proceeding anyway
+        # with whatever data has been collected (the fallback recommendation
+        # engine handles residual gaps).
+        MAX_CLARIFYING_ROUNDS = 3
+
         def route_missing_data(state: GraphState) -> str:
             missing = state.get("missing_fields", [])
-            iteration = state.get("iteration_count", 0)
-            # If >2 critical fields missing AND this is the first pass, ask for more data
-            if len(missing) > 2 and iteration == 0:
+            iteration = state.get("iteration_count", 1)
+            if len(missing) > 2 and iteration <= MAX_CLARIFYING_ROUNDS:
                 return END
             return "environmental_analysis"
 
@@ -93,25 +107,39 @@ class EcoIntelWorkflow:
         workflow.add_edge("recommendation_generation", "report_creation")
         workflow.add_edge("report_creation", END)
 
-        return workflow.compile()
+        return workflow.compile(checkpointer=self._checkpointer)
 
     # -------------------------------------------------------------------------
     # Node implementations
     # -------------------------------------------------------------------------
 
     def _input_processing_node(self, state: GraphState) -> Dict[str, Any]:
-        """Node 1: Parse raw input (try JSON first, fall back to NL parsing)."""
+        """Node 1: Parse raw input (try JSON first, fall back to NL parsing).
+
+        Merges newly parsed fields on top of whatever this session already
+        collected in earlier turns (loaded from the checkpointer), so a
+        follow-up answer like "soil carbon is 0.3%" fills in a gap instead
+        of starting the whole assessment over from empty.
+        """
         raw_input = state.get("raw_input", "")
+        previously_collected = state.get("parsed_input") or {}
         logger.info(f"[Node 1] Processing input: {raw_input[:100]}...")
 
         try:
-            parsed = json.loads(raw_input)
+            new_fields = json.loads(raw_input)
             logger.info("[Node 1] Input parsed as structured JSON.")
         except (json.JSONDecodeError, TypeError):
             logger.info("[Node 1] Input is natural language. Parsing with LLM...")
-            parsed = self.analyzer.parse_natural_language(raw_input)
+            new_fields = self.analyzer.parse_natural_language(raw_input)
 
-        return {"parsed_input": parsed, "current_node": "input_processing"}
+        merged = {**previously_collected, **{k: v for k, v in new_fields.items() if v is not None}}
+        next_iteration = state.get("iteration_count", 0) + 1
+
+        return {
+            "parsed_input": merged,
+            "iteration_count": next_iteration,
+            "current_node": "input_processing",
+        }
 
     def _missing_data_detection_node(self, state: GraphState) -> Dict[str, Any]:
         """Node 2: Check for missing critical environmental data."""
@@ -304,38 +332,55 @@ class EcoIntelWorkflow:
     # Public API
     # -------------------------------------------------------------------------
 
-    def run(self, raw_input: str) -> Dict[str, Any]:
+    def run(self, raw_input: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Execute the full assessment pipeline.
+        Execute the assessment pipeline for one turn of a conversation.
 
         Args:
             raw_input: Either a JSON string of environmental data or
                        a natural language description.
+            session_id: Optional conversation/session identifier. When
+                        provided, fields collected in earlier calls with the
+                        same session_id are carried forward and merged with
+                        this turn's input, enabling true multi-turn
+                        clarifying-question flows. When omitted, each call
+                        is treated as a fresh, single-turn assessment.
 
         Returns:
             Final state dict containing assessment_report or follow_up_questions.
         """
-        initial_state: GraphState = {
-            "raw_input": raw_input,
-            "parsed_input": {},
-            "missing_fields": [],
-            "follow_up_questions": [],
-            "environmental_analysis": None,
-            "retrieved_evidence": [],
-            "scientific_reasoning": None,
-            "recommendations": [],
-            "assessment_report": None,
-            "error": None,
-            "current_node": "start",
-            "iteration_count": 0,
-        }
+        thread_id = session_id or f"anon-{uuid.uuid4()}"
+        config = {"configurable": {"thread_id": thread_id}}
+
+        input_state = {"raw_input": raw_input}
+
+        # Only seed the full default state on a session's first turn -- on
+        # later turns the checkpointer already holds parsed_input,
+        # iteration_count, etc. from the prior turn for this thread_id.
+        existing = self.graph.get_state(config)
+        if not existing.values:
+            input_state = {
+                "raw_input": raw_input,
+                "parsed_input": {},
+                "missing_fields": [],
+                "follow_up_questions": [],
+                "environmental_analysis": None,
+                "retrieved_evidence": [],
+                "scientific_reasoning": None,
+                "recommendations": [],
+                "assessment_report": None,
+                "error": None,
+                "current_node": "start",
+                "iteration_count": 0,
+            }
 
         try:
-            result = self.graph.invoke(initial_state)
+            result = self.graph.invoke(input_state, config=config)
+            result["session_id"] = thread_id
             return result
         except Exception as e:
             logger.error(f"Workflow execution failed: {e}", exc_info=True)
-            return {**initial_state, "error": str(e)}
+            return {"error": str(e), "session_id": thread_id}
 
     def get_knowledge_base_stats(self) -> dict:
         """Return knowledge base statistics."""

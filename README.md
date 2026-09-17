@@ -214,6 +214,12 @@ cp .env.example .env
 python app.py
 ```
 
+Or with Docker:
+```bash
+docker build -t ecointel-ai .
+docker run -p 8000:8000 --env-file .env ecointel-ai
+```
+
 The API will be available at `http://localhost:8000`.
 
 ---
@@ -239,16 +245,39 @@ Health check endpoint.
 
 ### `POST /analyze`
 
-Analyze environmental data. Accepts natural language or structured JSON.
+Analyze environmental data. Accepts natural language or structured JSON, and an
+optional `session_id` for multi-turn conversations.
 
-**Natural Language Request:**
+**First turn (natural language, incomplete):**
 ```json
 {
-  "natural_language": "My biodiversity is declining and rainfall has been low. We practice monoculture wheat farming in a semi-arid region."
+  "natural_language": "My biodiversity is declining."
 }
 ```
 
-**Structured Request:**
+**Response — asks a clarifying question and returns a `session_id`:**
+```json
+{
+  "status": "needs_more_info",
+  "session_id": "a1b2c3d4-...",
+  "questions": [
+    "What is the approximate soil organic carbon percentage?",
+    "What type of land use practice is followed?",
+    "What has rainfall been like recently?"
+  ],
+  "missing_fields": ["soil_carbon", "land_use", "rainfall"]
+}
+```
+
+**Second turn — pass the same `session_id` so the answer is merged with what was already collected, rather than starting over:**
+```json
+{
+  "session_id": "a1b2c3d4-...",
+  "natural_language": "Soil carbon is 0.3%, rainfall is low, we grow monoculture wheat in a semi-arid region."
+}
+```
+
+**Structured Request (single turn, all fields known):**
 ```json
 {
   "input_data": {
@@ -266,6 +295,7 @@ Analyze environmental data. Accepts natural language or structured JSON.
 ```json
 {
   "status": "completed",
+  "session_id": "a1b2c3d4-...",
   "result": {
     "report_id": "uuid",
     "ecosystem_health_status": "...",
@@ -278,17 +308,7 @@ Analyze environmental data. Accepts natural language or structured JSON.
 }
 ```
 
-**Response (Needs More Data):**
-```json
-{
-  "status": "needs_more_info",
-  "questions": [
-    "What is the approximate soil organic carbon percentage?",
-    "What type of land use practice is followed?"
-  ],
-  "missing_fields": ["soil_carbon", "land_use", "temperature"]
-}
-```
+If `session_id` is omitted, each call is treated as an independent, single-turn assessment (no memory carried forward).
 
 ### `POST /assessment`
 
@@ -343,6 +363,45 @@ ecointel-ai/
 
 ---
 
+## 🗄️ Database / Schema
+
+The system has no relational database. Persistent state lives in two places:
+
+**Vector store (ChromaDB, on disk at `vectordb/`)**
+Single collection `ecointel_knowledge`. Each entry:
+
+| field         | type            | notes                                                    |
+|---------------|-----------------|-----------------------------------------------------------|
+| id            | auto (Chroma)   |                                                             |
+| page_content  | text            | scientific fact chunk (from PDFs in `data/`, or the built-in fallback knowledge set if `data/` has none) |
+| embedding     | vector(384)     | BAAI/bge-small-en-v1.5, cosine-normalized                  |
+| metadata.source | text          | originating report / institution                           |
+| metadata.topic  | text          | e.g. "Soil Health", "Agroforestry"                          |
+| metadata.year   | int           | publication year, where known                               |
+
+`load_and_index_documents()` is idempotent: it checks the collection count before indexing, so restarting the app does not duplicate chunks. Delete `vectordb/` to force a clean re-index (e.g. after adding new PDFs to `data/`).
+
+**Conversation state (LangGraph `MemorySaver`, in-process)**
+Each `session_id` maps to a `GraphState` checkpoint (`parsed_input`, `missing_fields`, `iteration_count`, etc.). This is what lets a multi-turn conversation — e.g. "biodiversity is declining" → clarifying question → "soil carbon is 0.3%, monoculture wheat" — accumulate fields across calls instead of resetting each time. It is in-memory and per-process; swap `MemorySaver` for a persistent LangGraph checkpointer (e.g. Postgres-backed) before running multiple workers or restarting between a user's turns.
+
+---
+
+## 🔄 CI/CD
+
+`.github/workflows/ci.yml` runs on every push and PR:
+1. Installs dependencies from `requirements.txt`
+2. Byte-compiles `app.py`, `cli.py`, `modules/`, `prompts/` as a fast smoke test
+3. Runs `tests/test_components.py` with a dummy API key (tests cover Pydantic model validation and the rule-based recommendation fallback, so they don't require a real Gemini key)
+
+A `Dockerfile` is included for containerized deployment:
+```bash
+docker build -t ecointel-ai .
+docker run -p 8000:8000 --env-file .env ecointel-ai
+```
+There is no deployment step wired into CI yet — add one (Render, Fly.io, Cloud Run) targeting this Dockerfile for a live demo URL.
+
+---
+
 ## 🔮 Future Improvements
 
 - **Time-series analysis**: Track ecosystem changes over time with historical data
@@ -351,7 +410,7 @@ ecointel-ai/
 - **Multi-region comparison**: Compare ecosystem health across geographic regions
 - **Interactive dashboards**: Visualization of environmental metrics and trends
 - **Webhook notifications**: Alert stakeholders when risk levels change
-- **PDF report export**: Generate downloadable PDF assessment reports
+- **PDF report export**: HTML export exists via `modules/pdf_exporter.py` (CLI only, see `cli.py --html`); extend to real PDF and wire it into the API
 - **Multi-language support**: Support for regional languages in input/output
 - **Federated knowledge**: Connect to multiple scientific databases (Scopus, PubMed)
 - **Confidence calibration**: ML-based confidence scoring with validation datasets

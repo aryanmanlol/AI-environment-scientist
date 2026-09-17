@@ -131,7 +131,8 @@ async def analyze(request: AnalysisRequest):
     raw_input = _extract_raw_input(request)
 
     try:
-        result = workflow.run(raw_input)
+        result = workflow.run(raw_input, session_id=request.session_id)
+        session_id = result.get("session_id")
 
         if result.get("error"):
             raise HTTPException(status_code=500, detail=result["error"])
@@ -139,17 +140,19 @@ async def analyze(request: AnalysisRequest):
         if result.get("assessment_report"):
             return {
                 "status": "completed",
+                "session_id": session_id,
                 "result": result["assessment_report"],
             }
         elif result.get("follow_up_questions"):
             return {
                 "status": "needs_more_info",
                 "message": "Additional environmental data is needed for a complete assessment.",
+                "session_id": session_id,
                 "questions": result["follow_up_questions"],
                 "missing_fields": result.get("missing_fields", []),
             }
         else:
-            return {"status": "incomplete", "state": _safe_serialize(result)}
+            return {"status": "incomplete", "session_id": session_id, "state": _safe_serialize(result)}
 
     except HTTPException:
         raise
@@ -170,7 +173,8 @@ async def assessment(request: AnalysisRequest):
     raw_input = _extract_raw_input(request)
 
     try:
-        result = workflow.run(raw_input)
+        result = workflow.run(raw_input, session_id=request.session_id)
+        session_id = result.get("session_id")
 
         if result.get("error"):
             raise HTTPException(status_code=500, detail=result["error"])
@@ -179,12 +183,14 @@ async def assessment(request: AnalysisRequest):
             report = result["assessment_report"]
             return {
                 "status": "completed",
+                "session_id": session_id,
                 "assessment_report": report,
             }
         elif result.get("follow_up_questions"):
             return {
                 "status": "needs_more_info",
                 "message": "Additional environmental data is needed for a complete assessment.",
+                "session_id": session_id,
                 "questions": result["follow_up_questions"],
                 "missing_fields": result.get("missing_fields", []),
             }
